@@ -22,6 +22,7 @@ import multiprocessing as mp
 import os
 import subprocess
 import sys
+import tempfile
 
 import numpy as np
 
@@ -30,7 +31,7 @@ sys.path.insert(0, os.path.join(ROOT, "scripts"))
 
 MODEL = os.path.join(ROOT, "output", "range_10m", "range_10m.glb")
 OUT = os.path.join(ROOT, "output", "range_10m", "walkthrough.mp4")
-FRAMEDIR = "/tmp/claude-1000/-home-ishan-code-vrshooting/flythrough_frames"
+FRAMEDIR = os.path.join(tempfile.gettempdir(), "vrshooting_flythrough_frames")
 
 LANE = 23                       # the lane this walkthrough is about
 LANE_X = -19.5 + (LANE - 1)     # = 2.5; lanes run 1..40 at 1 m pitch, centred on 0
