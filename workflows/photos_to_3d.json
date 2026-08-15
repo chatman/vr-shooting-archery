@@ -1,0 +1,577 @@
+{
+  "100": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 00"
+    },
+    "inputs": {
+      "image": "karni10m/view00.png"
+    }
+  },
+  "101": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 01"
+    },
+    "inputs": {
+      "image": "karni10m/view01.png"
+    }
+  },
+  "102": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 02"
+    },
+    "inputs": {
+      "image": "karni10m/view02.png"
+    }
+  },
+  "103": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 03"
+    },
+    "inputs": {
+      "image": "karni10m/view03.png"
+    }
+  },
+  "104": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 04"
+    },
+    "inputs": {
+      "image": "karni10m/view04.png"
+    }
+  },
+  "105": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 05"
+    },
+    "inputs": {
+      "image": "karni10m/view05.png"
+    }
+  },
+  "106": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 06"
+    },
+    "inputs": {
+      "image": "karni10m/view06.png"
+    }
+  },
+  "107": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 07"
+    },
+    "inputs": {
+      "image": "karni10m/view07.png"
+    }
+  },
+  "108": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 08"
+    },
+    "inputs": {
+      "image": "karni10m/view08.png"
+    }
+  },
+  "109": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 09"
+    },
+    "inputs": {
+      "image": "karni10m/view09.png"
+    }
+  },
+  "201": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view01"
+    },
+    "inputs": {
+      "image1": [
+        "100",
+        0
+      ],
+      "image2": [
+        "101",
+        0
+      ]
+    }
+  },
+  "202": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view02"
+    },
+    "inputs": {
+      "image1": [
+        "201",
+        0
+      ],
+      "image2": [
+        "102",
+        0
+      ]
+    }
+  },
+  "203": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view03"
+    },
+    "inputs": {
+      "image1": [
+        "202",
+        0
+      ],
+      "image2": [
+        "103",
+        0
+      ]
+    }
+  },
+  "204": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view04"
+    },
+    "inputs": {
+      "image1": [
+        "203",
+        0
+      ],
+      "image2": [
+        "104",
+        0
+      ]
+    }
+  },
+  "205": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view05"
+    },
+    "inputs": {
+      "image1": [
+        "204",
+        0
+      ],
+      "image2": [
+        "105",
+        0
+      ]
+    }
+  },
+  "206": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view06"
+    },
+    "inputs": {
+      "image1": [
+        "205",
+        0
+      ],
+      "image2": [
+        "106",
+        0
+      ]
+    }
+  },
+  "207": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view07"
+    },
+    "inputs": {
+      "image1": [
+        "206",
+        0
+      ],
+      "image2": [
+        "107",
+        0
+      ]
+    }
+  },
+  "208": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view08"
+    },
+    "inputs": {
+      "image1": [
+        "207",
+        0
+      ],
+      "image2": [
+        "108",
+        0
+      ]
+    }
+  },
+  "209": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view09"
+    },
+    "inputs": {
+      "image1": [
+        "208",
+        0
+      ],
+      "image2": [
+        "109",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "LoadDA3Model",
+    "_meta": {
+      "title": "Depth Anything 3 (base)"
+    },
+    "inputs": {
+      "model_name": "depth_anything_3_base.safetensors",
+      "weight_dtype": "fp32"
+    }
+  },
+  "11": {
+    "class_type": "DA3Inference",
+    "_meta": {
+      "title": "DA3 multi-view: joint geometry + camera poses"
+    },
+    "inputs": {
+      "da3_model": [
+        "10",
+        0
+      ],
+      "image": [
+        "209",
+        0
+      ],
+      "resolution": 1008,
+      "resize_method": "upper_bound_resize",
+      "mode": "multiview",
+      "mode.ref_view_strategy": "saddle_balanced",
+      "mode.pose_method": "cam_dec"
+    }
+  },
+  "300": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view00"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 0,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "400": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view00"
+    },
+    "inputs": {
+      "mesh": [
+        "300",
+        0
+      ],
+      "filename_prefix": "karni/view00"
+    }
+  },
+  "301": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view01"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 1,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "401": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view01"
+    },
+    "inputs": {
+      "mesh": [
+        "301",
+        0
+      ],
+      "filename_prefix": "karni/view01"
+    }
+  },
+  "302": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view02"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 2,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "402": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view02"
+    },
+    "inputs": {
+      "mesh": [
+        "302",
+        0
+      ],
+      "filename_prefix": "karni/view02"
+    }
+  },
+  "303": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view03"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 3,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "403": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view03"
+    },
+    "inputs": {
+      "mesh": [
+        "303",
+        0
+      ],
+      "filename_prefix": "karni/view03"
+    }
+  },
+  "304": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view04"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 4,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "404": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view04"
+    },
+    "inputs": {
+      "mesh": [
+        "304",
+        0
+      ],
+      "filename_prefix": "karni/view04"
+    }
+  },
+  "305": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view05"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 5,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "405": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view05"
+    },
+    "inputs": {
+      "mesh": [
+        "305",
+        0
+      ],
+      "filename_prefix": "karni/view05"
+    }
+  },
+  "306": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view06"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 6,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "406": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view06"
+    },
+    "inputs": {
+      "mesh": [
+        "306",
+        0
+      ],
+      "filename_prefix": "karni/view06"
+    }
+  },
+  "307": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view07"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 7,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "407": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view07"
+    },
+    "inputs": {
+      "mesh": [
+        "307",
+        0
+      ],
+      "filename_prefix": "karni/view07"
+    }
+  },
+  "308": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view08"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 8,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "408": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view08"
+    },
+    "inputs": {
+      "mesh": [
+        "308",
+        0
+      ],
+      "filename_prefix": "karni/view08"
+    }
+  },
+  "309": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view09"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 9,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "409": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view09"
+    },
+    "inputs": {
+      "mesh": [
+        "309",
+        0
+      ],
+      "filename_prefix": "karni/view09"
+    }
+  }
+}

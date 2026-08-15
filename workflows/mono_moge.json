@@ -1,0 +1,46 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Single photograph" },
+    "inputs": { "image": "kalyani/full0.png" }
+  },
+
+  "10": {
+    "class_type": "LoadMoGeModel",
+    "_meta": { "title": "MoGe-2 ViT-L (normals)" },
+    "inputs": { "model_name": "moge-2-vitl-normal.pt" }
+  },
+
+  "11": {
+    "class_type": "MoGeInference",
+    "_meta": { "title": "MoGe perspective inference" },
+    "inputs": {
+      "moge_model": ["10", 0],
+      "image": ["1", 0],
+      "resolution_level": 9,
+      "fov_x_degrees": 0.0,
+      "batch_size": 1,
+      "force_projection": true,
+      "apply_mask": true,
+      "apply_metric_scale": true
+    }
+  },
+
+  "12": {
+    "class_type": "MoGePointMapToMesh",
+    "_meta": { "title": "Point map -> textured mesh" },
+    "inputs": {
+      "moge_geometry": ["11", 0],
+      "batch_index": 0,
+      "decimation": 1,
+      "discontinuity_threshold": 0.05,
+      "texture": true
+    }
+  },
+
+  "13": {
+    "class_type": "SaveGLB",
+    "_meta": { "title": "Save world" },
+    "inputs": { "mesh": ["12", 0], "filename_prefix": "kalyani/moge0" }
+  }
+}

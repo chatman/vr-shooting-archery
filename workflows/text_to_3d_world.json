@@ -1,0 +1,112 @@
+{
+  "1": {
+    "class_type": "CheckpointLoaderSimple",
+    "_meta": { "title": "FLUX.1-dev (model + text encoders + VAE)" },
+    "inputs": { "ckpt_name": "flux1-dev-fp8.safetensors" }
+  },
+
+  "2": {
+    "class_type": "LoraLoader",
+    "_meta": { "title": "LayerPano3D equirectangular panorama LoRA" },
+    "inputs": {
+      "model": ["1", 0],
+      "clip": ["1", 1],
+      "lora_name": "layerpano3d_flux_pano_comfy.safetensors",
+      "strength_model": 1.0,
+      "strength_clip": 1.0
+    }
+  },
+
+  "3": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Scene prompt" },
+    "inputs": {
+      "clip": ["2", 1],
+      "text": "A 360 degree equirectangular panorama of the interior of an enclosed indoor 10 meter shooting range. Five large round black and white paper bullseye targets hang in a row along the range wall, evenly spaced and clearly visible, ten meters downrange. A long wooden shooting bench table stands at the firing line with the empty lane between it and the targets. The room is completely closed with plain concrete walls, a flat ceiling and no windows. White wall mounted split air conditioner units with louvred vents are installed high on the walls near the ceiling. Bright even ceiling light panels give strong clean lighting throughout. Photorealistic interior architectural photography, sharp detail."
+    }
+  },
+
+  "4": {
+    "class_type": "CLIPTextEncode",
+    "_meta": { "title": "Negative (unused at cfg 1.0)" },
+    "inputs": { "clip": ["2", 1], "text": "" }
+  },
+
+  "5": {
+    "class_type": "FluxGuidance",
+    "_meta": { "title": "Guidance 7.0 (LayerPano3D recipe)" },
+    "inputs": { "conditioning": ["3", 0], "guidance": 7.0 }
+  },
+
+  "6": {
+    "class_type": "EmptySD3LatentImage",
+    "_meta": { "title": "1440x720 - the 2:1 ratio the LoRA was trained at" },
+    "inputs": { "width": 1440, "height": 720, "batch_size": 1 }
+  },
+
+  "7": {
+    "class_type": "KSampler",
+    "_meta": { "title": "Sample panorama" },
+    "inputs": {
+      "model": ["2", 0],
+      "positive": ["5", 0],
+      "negative": ["4", 0],
+      "latent_image": ["6", 0],
+      "seed": 21,
+      "steps": 50,
+      "cfg": 1.0,
+      "sampler_name": "euler",
+      "scheduler": "simple",
+      "denoise": 1.0
+    }
+  },
+
+  "8": {
+    "class_type": "VAEDecode",
+    "_meta": { "title": "Decode panorama" },
+    "inputs": { "samples": ["7", 0], "vae": ["1", 2] }
+  },
+
+  "9": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save equirectangular panorama" },
+    "inputs": { "images": ["8", 0], "filename_prefix": "shooting_range/panorama" }
+  },
+
+  "10": {
+    "class_type": "LoadMoGeModel",
+    "_meta": { "title": "MoGe-2 ViT-L geometry model" },
+    "inputs": { "model_name": "moge-2-vitl-normal.pt" }
+  },
+
+  "11": {
+    "class_type": "MoGePanoramaInference",
+    "_meta": { "title": "Panorama -> 3D geometry (12 perspective splits, merged)" },
+    "inputs": {
+      "moge_model": ["10", 0],
+      "image": ["8", 0],
+      "resolution_level": 9,
+      "split_resolution": 1024,
+      "merge_resolution": 1920,
+      "batch_size": 6
+    }
+  },
+
+  "12": {
+    "class_type": "MoGePointMapToMesh",
+    "_meta": { "title": "Point map -> textured mesh" },
+    "inputs": {
+      "moge_geometry": ["11", 0],
+      "batch_index": 0,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "texture": true
+    }
+  },
+
+  "13": {
+    "class_type": "SaveGLB",
+    "_meta": { "title": "Save 3D world" },
+    "inputs": { "mesh": ["12", 0], "filename_prefix": "shooting_range/world" }
+  }
+}

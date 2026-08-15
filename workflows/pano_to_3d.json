@@ -1,0 +1,44 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Existing equirectangular panorama" },
+    "inputs": { "image": "pano.png" }
+  },
+
+  "10": {
+    "class_type": "LoadMoGeModel",
+    "_meta": { "title": "MoGe-2 ViT-L geometry model" },
+    "inputs": { "model_name": "moge-2-vitl-normal.pt" }
+  },
+
+  "11": {
+    "class_type": "MoGePanoramaInference",
+    "_meta": { "title": "Panorama -> 3D geometry" },
+    "inputs": {
+      "moge_model": ["10", 0],
+      "image": ["1", 0],
+      "resolution_level": 9,
+      "split_resolution": 1024,
+      "merge_resolution": 1920,
+      "batch_size": 6
+    }
+  },
+
+  "12": {
+    "class_type": "MoGePointMapToMesh",
+    "_meta": { "title": "Point map -> textured mesh" },
+    "inputs": {
+      "moge_geometry": ["11", 0],
+      "batch_index": 0,
+      "decimation": 1,
+      "discontinuity_threshold": 0.0,
+      "texture": true
+    }
+  },
+
+  "13": {
+    "class_type": "SaveGLB",
+    "_meta": { "title": "Save 3D world" },
+    "inputs": { "mesh": ["12", 0], "filename_prefix": "eval/world" }
+  }
+}

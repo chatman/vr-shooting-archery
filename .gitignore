@@ -1,0 +1,19 @@
+# Generated and captured media stays out of git: output/ alone is ~811 MB of
+# photogrammetry meshes, per-view GLBs, renders and video. Everything here is
+# reproducible from the tracked source.
+output/*
+!output/range_10m/
+output/range_10m/*
+# ...except the specified hall itself, which is 1 MB and IS the deliverable.
+!output/range_10m/range_10m.glb
+
+# Source photographs for the reconstruction pipelines (see README).
+bhopal/
+kalyani/
+lakshya/
+
+# Vendored viewer library.
+viewer/lib/
+
+__pycache__/
+*.pyc

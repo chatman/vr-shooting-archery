@@ -1,0 +1,65 @@
+{
+  "1": {
+    "class_type": "LoadImage",
+    "_meta": { "title": "Single photograph" },
+    "inputs": { "image": "bhopal/shot0.png" }
+  },
+
+  "10": {
+    "class_type": "LoadDA3Model",
+    "_meta": { "title": "Depth Anything 3" },
+    "inputs": {
+      "model_name": "depth_anything_3_base.safetensors",
+      "weight_dtype": "fp32"
+    }
+  },
+
+  "11": {
+    "class_type": "DA3Inference",
+    "_meta": { "title": "DA3 mono: single-view geometry at native aspect" },
+    "inputs": {
+      "da3_model": ["10", 0],
+      "image": ["1", 0],
+      "resolution": 1036,
+      "resize_method": "upper_bound_resize",
+      "mode": "mono"
+    }
+  },
+
+  "12": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": { "title": "Depth -> textured mesh" },
+    "inputs": {
+      "da3_geometry": ["11", 0],
+      "batch_index": 0,
+      "decimation": 1,
+      "discontinuity_threshold": 0.03,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+
+  "13": {
+    "class_type": "SaveGLB",
+    "_meta": { "title": "Save world" },
+    "inputs": { "mesh": ["12", 0], "filename_prefix": "bhopal/shot0" }
+  },
+
+  "14": {
+    "class_type": "DA3Render",
+    "_meta": { "title": "Depth preview (sanity check)" },
+    "inputs": {
+      "da3_geometry": ["11", 0],
+      "output": "depth_colored",
+      "output.normalization": "v2_style",
+      "output.apply_sky_clip": false
+    }
+  },
+
+  "15": {
+    "class_type": "SaveImage",
+    "_meta": { "title": "Save depth preview" },
+    "inputs": { "images": ["14", 0], "filename_prefix": "bhopal/depth0" }
+  }
+}

@@ -1,0 +1,129 @@
+{
+  "100": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 00"
+    },
+    "inputs": {
+      "image": "kalyani/view00.png"
+    }
+  },
+  "101": {
+    "class_type": "LoadImage",
+    "_meta": {
+      "title": "view 01"
+    },
+    "inputs": {
+      "image": "kalyani/view01.png"
+    }
+  },
+  "201": {
+    "class_type": "ImageBatch",
+    "_meta": {
+      "title": "batch +view01"
+    },
+    "inputs": {
+      "image1": [
+        "100",
+        0
+      ],
+      "image2": [
+        "101",
+        0
+      ]
+    }
+  },
+  "10": {
+    "class_type": "LoadDA3Model",
+    "_meta": {
+      "title": "Depth Anything 3 (base)"
+    },
+    "inputs": {
+      "model_name": "depth_anything_3_base.safetensors",
+      "weight_dtype": "fp32"
+    }
+  },
+  "11": {
+    "class_type": "DA3Inference",
+    "_meta": {
+      "title": "DA3 multi-view: joint geometry + camera poses"
+    },
+    "inputs": {
+      "da3_model": [
+        "10",
+        0
+      ],
+      "image": [
+        "201",
+        0
+      ],
+      "resolution": 1008,
+      "resize_method": "upper_bound_resize",
+      "mode": "multiview",
+      "mode.ref_view_strategy": "saddle_balanced",
+      "mode.pose_method": "cam_dec"
+    }
+  },
+  "300": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view00"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 0,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "400": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view00"
+    },
+    "inputs": {
+      "mesh": [
+        "300",
+        0
+      ],
+      "filename_prefix": "karni/view00"
+    }
+  },
+  "301": {
+    "class_type": "DA3GeometryToMesh",
+    "_meta": {
+      "title": "mesh view01"
+    },
+    "inputs": {
+      "da3_geometry": [
+        "11",
+        0
+      ],
+      "batch_index": 1,
+      "decimation": 1,
+      "discontinuity_threshold": 0.04,
+      "confidence_threshold": 0.1,
+      "use_sky_mask": false,
+      "texture": true
+    }
+  },
+  "401": {
+    "class_type": "SaveGLB",
+    "_meta": {
+      "title": "save view01"
+    },
+    "inputs": {
+      "mesh": [
+        "301",
+        0
+      ],
+      "filename_prefix": "karni/view01"
+    }
+  }
+}

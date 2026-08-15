@@ -1,0 +1,35 @@
+The playing hall is a room with:
+* 6 meters of floor to ceiling height.
+* 30 meters width
+* 42 meters in length
+* The back wall has wood colour, and 40 targets of 10 meters air pistol (exact specs added at the end), spaced 1 meter apart, at a height of 1.5m from the floor.
+* Every target is enclosed within a green box with SIUS written on it. See sius.jpg file for reference.
+* There's a very long table along the entire length of the room, at a distance of 10 meters from the back wall. The height of the table is 1m from the floor, is wooden in colour/texture, and is a boxy shaped one (legs are not visible). The table top has length 40m and depth of 1m.
+* The floor colour is dark green between the table and the back wall, and black matte in front of the row of tables.
+* In front of the table, there are 40 chairs kept, 1 meter from each other and about 2 meters in front of the table.
+* The ceiling has rectangular lights all over the place so that the whole playing hall is well lit.
+* Let the front of the room have 4 doors from where players and audience members can enter. The wall be toughened glass.
+* Every target should have a lane number written on top of it (black on yellow, about 1 meter above the target) starting from 1 to 40. It should be large enough so that it is clearly legible from the back of the room.
+* On the front side of the table, corresponding lane/firing point numbers should be written (1 to 40).
+
+
+Target specs
+=============
+
+Overall Card & Layout
+----------------------
+Card Size: Minimum 170 mm × 170 mm square.
+Color Scheme: Rings 1 through 6 are white; rings 7 through 10 form the black center aiming mark.
+
+Ring Diameters
+---------------
+10-Ring: 11.5 mm
+Inner-Ten Circle: 5.0 mm (used as a tie-breaker)
+9-Ring: 27.5 mm
+8-Ring: 43.5 mm
+7-Ring (Start of black): 59.5 mm
+6-Ring: 75.5 mm
+Rings 5 down to 1: Scale outward incrementally (each ring increases radius by 8 mm per side, meaning diameter increases by 16 mm per step).
+Ring Line Thickness: 0.1 mm to 0.2 mm
+
+
