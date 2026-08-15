@@ -1,0 +1,17 @@
+# The model pipeline is authored on Linux/macOS and the Unity project on Windows.
+# Without this, every checkout rewrites line endings and the diffs are unreadable.
+* text=auto
+
+# Binary assets git must never try to normalise or diff as text.
+*.fbx binary
+*.glb binary
+*.ply binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.exr binary
+*.hdr binary
+*.mp4 binary
+*.apk binary
+*.aab binary
+*.unitypackage binary

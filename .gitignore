@@ -19,3 +19,24 @@ viewer/lib/
 
 __pycache__/
 *.pyc
+
+# Unity project (quest-app/). Library/ alone is ~10 GB and is a rebuildable
+# cache: Unity regenerates it on the next open. Everything ignored here is
+# derived from Assets/, Packages/ and ProjectSettings/, which are tracked.
+quest-app/[Ll]ibrary/
+quest-app/[Tt]emp/
+quest-app/[Oo]bj/
+quest-app/[Bb]uild/
+quest-app/[Bb]uilds/
+quest-app/[Ll]ogs/
+quest-app/[Uu]serSettings/
+quest-app/[Mm]emoryCaptures/
+quest-app/[Rr]ecordings/
+quest-app/.utmp/
+quest-app/.vscode/
+quest-app/*.csproj
+quest-app/*.sln
+quest-app/*.unityproj
+quest-app/*.user
+quest-app/*.apk
+quest-app/*.aab

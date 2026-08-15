@@ -455,3 +455,76 @@ catch per pixel.
   survive the view from the back of the hall.
 - **The hall is 30 m deep and the shooting only uses 13 m of it.** That is what the brief
   asks for. The 17 m behind the chairs is empty floor waiting for spectator seating.
+
+---
+
+# Quest 3 app (Unity)
+
+`quest-app/` puts the hall on a Meta Quest 3. It consumes `output/range_10m/unity/` — the
+FBX, its nine textures and the generated `RangeSetup.cs` — and adds only what a headset
+needs: URP, the XR plumbing, a lightmap, and a scene with the player standing at firing
+point 23 facing downrange.
+
+Unity 6000.0.81f1, Meta XR SDK 205.0.0. Built and verified: 48.2 MB APK, `arm64-v8a`,
+`android.hardware.vr.headtracking`, min SDK 32.
+
+## Usage
+
+```bash
+cd quest-app
+./deploy.ps1                # build, install to a tethered Quest, launch
+./deploy.ps1 -SkipBuild     # reinstall the last APK without rebuilding
+```
+
+Developer Mode must be on and the in-headset "Allow USB debugging" prompt accepted, or
+`adb devices` reports `unauthorized` and the install fails. The app appears under
+**Library ▸ Unknown Sources**, not with the store apps.
+
+Everything the deploy script depends on is reproducible from a clean clone via the
+**Quest** menu in the editor, in order: player settings, URP, model import, scene, bake.
+`ArcheryRangeSetup.ConfigureAll` runs the first four in one headless editor launch.
+
+## URP is not optional
+
+`RangeSetup.FixMaterials` looks up `Universal Render Pipeline/Lit` and aborts if it is
+missing, so the hall's materials — both glass materials especially — only import correctly
+on URP. A default Unity project is not on URP, so `Quest ▸ 2` creates the pipeline asset
+and assigns it to both Graphics and Quality settings before the import runs. MSAA 4×, HDR
+off, one shadow cascade, no opaque texture: the room is lit by a bake, so the shadow and
+HDR budget buys nothing.
+
+The import settings are the ones this repo's own `output/range_10m/unity/README.md`
+specifies, applied through `ModelImporter` rather than by hand — scale 1 with Convert
+Units, lightmap UVs on, normals imported rather than recalculated. The hall lands at
+**42.0 × 6.0 × 30.0 m**, which matches the build's own round-trip assertion.
+
+## The bake is the whole lighting
+
+The 35 lamps and the emissive ceiling panels are baked-only, by design — 35 realtime point
+lights is not a Quest budget. Until the bake runs, the hall renders black.
+
+**A headless bake with the GPU lightmapper silently does nothing.** Progressive GPU needs
+an OpenCL device; a batch-mode editor has none, and `Lightmapping.Bake()` returns normally
+having baked nothing at all, so the run exits 0 and looks like a success. The first bake
+here did exactly that. `ArcheryRangeSetup` now uses Progressive CPU and, more importantly,
+counts `LightmapSettings.lightmaps` afterwards and fails loudly on zero — a bake that
+cannot report its own failure is worse than one that never ran.
+
+At the README's recommended 3 texels per unit the result is one lightmap, 395 KB of EXR
+plus a 44 KB directionality map. The default 40 texels/unit over ~2,500 m² of surface is
+the trap that warning exists for.
+
+## Limitations
+
+- **The FBX is copied into `quest-app/Assets/Models/`, not referenced.** Unity will only
+  import assets under `Assets/`, so rebuilding the hall means re-running the copy — the
+  Unity project can silently drift from `output/`. The clean fix is for
+  `scripts/export_unity.py` to write straight into `quest-app/Assets/Models/`.
+- **No interaction yet.** The player stands at firing point 23 and can look around. There
+  is no bow, no arrow, no scoring — the Interaction SDK is installed but unused.
+- **The bake is low resolution.** 3 texels/unit is the right starting point for iteration
+  speed, not a shipping value. Raise it once the scene stops changing.
+- **Baked on CPU, on this machine, with no OpenCL device.** A workstation with a working
+  GPU lightmapper will bake the same scene far faster and can afford more texels.
+- **Colliders are mesh colliders, from `RangeSetup`.** Fine for a static room; if physics
+  props get added, the floor wants a box collider instead.
