@@ -4,8 +4,10 @@
 output/*
 !output/range_10m/
 output/range_10m/*
-# ...except the specified hall itself, which is 1 MB and IS the deliverable.
+# ...except the deliverables: the hall itself and the Unity/Quest bundle.
 !output/range_10m/range_10m.glb
+!output/range_10m/unity/
+!output/range_10m/unity/**
 
 # Source photographs for the reconstruction pipelines (see README).
 bhopal/
