@@ -1,9 +1,11 @@
 using System.IO;
+using System.Linq;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.Rendering;
 using UnityEngine.Rendering.Universal;
+using UnityEngine.SpatialTracking;
 
 /// <summary>
 /// Brings output/range_10m into the Quest app: URP (which RangeSetup's material
@@ -19,8 +21,15 @@ public static class ArcheryRangeSetup
     const string LightingPath = SettingsFolder + "/RangeLighting.lighting";
     const string ScenePath = "Assets/Scenes/Range.unity";
 
-    // From the range README: firing point 23, facing downrange (+Z).
-    static readonly Vector3 SpawnPosition = new Vector3(2.5f, 0f, -11.75f);
+    // Firing point 23. The hall runs Z 0..30 with the targets at Z=0 and the
+    // firing bench at Z=10.5, so the shooter stands at +11.75 and looks down -Z.
+    // This was -11.75 with identity rotation, which put the player ~12 m behind
+    // the back wall facing away from the room — nothing to see but empty space.
+    // X is unchanged: lane 23 of 40 across a 39.5 m spread lands at +2.5.
+    static readonly Vector3 SpawnPosition = new Vector3(2.5f, 0f, 11.75f);
+
+    // Identity faces +Z, i.e. away from the targets, so the rig is turned round.
+    static readonly Quaternion SpawnRotation = Quaternion.Euler(0f, 180f, 0f);
 
     // ------------------------------------------------------------------ URP
 
@@ -175,9 +184,30 @@ public static class ArcheryRangeSetup
         var prefab = AssetDatabase.LoadAssetAtPath<GameObject>(path);
         var rig = (GameObject)PrefabUtility.InstantiatePrefab(prefab);
 
-        // Identity rotation already faces +Z, which the README defines as downrange.
         rig.transform.position = SpawnPosition;
-        rig.transform.rotation = Quaternion.identity;
+        rig.transform.rotation = SpawnRotation;
+
+        // OVRCameraRig is supposed to pose its own anchors from OVRPlugin, but on
+        // this build the stereo display comes up while the view stays locked — the
+        // anchors never move. A TrackedPoseDriver on the centre-eye camera reads
+        // the pose from Unity's XR input subsystem instead, which works whichever
+        // provider owns the session. Without this, head tracking does not work at
+        // all, and a scene rebuilt through this method loses it silently.
+        var centreEye = rig.GetComponentsInChildren<Transform>(true)
+                           .FirstOrDefault(t => t.name == "CenterEyeAnchor");
+        if (centreEye == null)
+        {
+            Debug.LogWarning("[Range] No CenterEyeAnchor on the rig; head tracking will not work.");
+        }
+        else if (centreEye.GetComponent<TrackedPoseDriver>() == null)
+        {
+            var tpd = centreEye.gameObject.AddComponent<TrackedPoseDriver>();
+            tpd.SetPoseSource(TrackedPoseDriver.DeviceType.GenericXRDevice,
+                              TrackedPoseDriver.TrackedPose.Center);
+            tpd.trackingType = TrackedPoseDriver.TrackingType.RotationAndPosition;
+            tpd.updateType = TrackedPoseDriver.UpdateType.UpdateAndBeforeRender;
+            Debug.Log("[Range] TrackedPoseDriver added to CenterEyeAnchor.");
+        }
 
         // Floor Level means the tracked origin sits on the physical floor and the
         // headset lands at the player's real standing height against the model.
