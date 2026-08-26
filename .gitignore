@@ -40,3 +40,6 @@ quest-app/*.unityproj
 quest-app/*.user
 quest-app/*.apk
 quest-app/*.aab
+
+# Editor screenshot output (Quest ▸ camera captures), regenerated on demand.
+quest-app/[Cc]aptures/

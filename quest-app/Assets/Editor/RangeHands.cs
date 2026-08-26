@@ -50,11 +50,19 @@ public static class RangeHands
             EditorUtility.SetDirty(mgr);
         }
 
-        AttachHand(rig.leftHandAnchor, isLeft: true);
-        AttachHand(rig.rightHandAnchor, isLeft: false);
-
-        AttachController(rig.leftControllerAnchor, isLeft: true);
-        AttachController(rig.rightControllerAnchor, isLeft: false);
+        // The hand and controller visuals used to be attached here, as an OVRHandPrefab and
+        // an OVRControllerPrefab under each anchor. The Touch Hand Grab Building Block
+        // brought in the Interactions Rig, which carries its own OVRHands data sources,
+        // HandVisuals and OVRControllerVisuals -- so attaching them here as well drew two
+        // hands and two controllers in the same place. The rig owns the visuals now; what
+        // is left below is the tracking configuration, which it does not do.
+        //
+        // AttachHand/AttachController are kept, unused, for the same reason the prefabs
+        // are still referenced: dropping the Interactions Rig would need them back.
+        RemoveLegacyVisual(rig.leftHandAnchor, "OVRHandL");
+        RemoveLegacyVisual(rig.rightHandAnchor, "OVRHandR");
+        RemoveLegacyVisual(rig.leftControllerAnchor, "OVRControllerL");
+        RemoveLegacyVisual(rig.rightControllerAnchor, "OVRControllerR");
 
         // ---- spawn behind the chair ----
         rig.transform.position = SpawnBehindChair;
@@ -88,6 +96,21 @@ public static class RangeHands
         {
             Debug.LogWarning($"[Hands] could not set project config: {e.Message}");
         }
+    }
+
+    /// <summary>
+    /// Drops a hand or controller visual left over from before the Interactions Rig, so a
+    /// re-run of this script leaves the scene with one pair of hands rather than two.
+    /// </summary>
+    static void RemoveLegacyVisual(Transform anchor, string name)
+    {
+        if (anchor == null) return;
+
+        var existing = anchor.Find(name);
+        if (existing == null) return;
+
+        Debug.Log($"[Hands] removed {name} -- the Interactions Rig draws this now");
+        Object.DestroyImmediate(existing.gameObject);
     }
 
     static void AttachHand(Transform anchor, bool isLeft)
