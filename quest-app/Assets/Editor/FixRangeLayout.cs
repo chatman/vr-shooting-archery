@@ -27,10 +27,11 @@ public static class FixRangeLayout
 
     const int Lane = 19;
     const float BenchTopY = 1.0f;
-    const float BenchMidZ = 10.5f;
+    const float BenchMidZ = 10.85f;
 
-    // Chairs sit at z = 13, the bench back face at z = 11; midway is z = 12.
-    const float StandZ = 12.0f;
+    // The bench spans z = 10..11. Standing at 11.45 puts the player right at the bench
+    // with the pistol about 0.6 m away -- within arm's reach without walking.
+    const float StandZ = 11.45f;
 
     static float LaneX(int lane) => 20.5f - lane;
 
