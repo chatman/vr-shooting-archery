@@ -69,6 +69,12 @@ public class CrowdRecorder : MonoBehaviour
 
     void Awake()
     {
+        // Without this the player loop stops the moment the editor loses focus, and the
+        // recording sits at two frames until someone clicks on Unity again. Set here, at
+        // runtime, rather than in Player Settings: a recording tool has no business
+        // changing how the shipped app behaves.
+        Application.runInBackground = true;
+
         _total = Mathf.RoundToInt(Fps * Seconds);
         _dir = System.IO.Path.Combine(Application.dataPath, "..", "Captures", "crowd");
         _dir = System.IO.Path.GetFullPath(_dir);
