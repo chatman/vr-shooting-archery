@@ -118,7 +118,15 @@ public static class AddAudience
     /// Spectator.cs has the reasoning in full. Raise it if the profiler says there is
     /// room; it is the one number in here worth tuning on the headset.
     /// </summary>
-    const int AnimatedRows = 2;
+    const int AnimatedRows = 3;
+
+    /// <summary>
+    /// Rows up to this one sway. Rows at or beyond it hold still and are batching-static,
+    /// which is what buys one draw call per skin for the back of the stand. Two rows of
+    /// slow leaning between the animated front and the still back is enough that the eye
+    /// never finds the line where motion stops.
+    /// </summary>
+    const int SwayRows = 6;
 
     /// <summary>Share of the rigid tier placed on its feet rather than seated.</summary>
     const float StandingShare = 0.08f;
@@ -144,6 +152,8 @@ public static class AddAudience
         new Finish("audience_deck",   new Color(0.34f, 0.34f, 0.36f), 0.15f),
         new Finish("audience_rail",   new Color(0.55f, 0.57f, 0.60f), 0.70f),
         new Finish("audience_seat",   new Color(0.11f, 0.22f, 0.52f), 0.35f),  // the blue stand at Bhopal
+        new Finish("audience_coat",   new Color(0.16f, 0.17f, 0.20f), 0.12f),  // left over a seat back
+        new Finish("audience_bag",    new Color(0.24f, 0.21f, 0.18f), 0.14f),  // on the deck underfoot
     };
 
     [MenuItem("Quest/13. Build the Audience")]
@@ -179,6 +189,7 @@ public static class AddAudience
         peopleRoot.transform.SetParent(root.transform, false);
         _people = peopleRoot.transform;
 
+        _buckets = buckets;
         LoadPrefabs();
         BuildDeck(buckets, tierY);
         BuildBarrier(buckets);
@@ -235,7 +246,7 @@ public static class AddAudience
             var mf = s.GetComponentInChildren<MeshFilter>();
             var m = smr != null ? smr.sharedMesh : (mf != null ? mf.sharedMesh : null);
             if (m != null) crowdTris += (int)(m.GetIndexCount(0) / 3);
-            if (s.name.Contains("Standing")) standing++;
+            if (s.name.Contains("stand_")) standing++;
         }
 
         Debug.Log("[Audience] " + seats + " seats, " + people + " occupied (" +
@@ -323,9 +334,19 @@ public static class AddAudience
             // Stagger alternate rows half a pitch: this is what makes C = 60 mm honest.
             float stagger = (n % 2 == 0) ? 0f : SeatPitch * 0.5f;
 
-            // Clustering: a per-row bias so occupancy clumps instead of sprinkling evenly.
-            float clusterCentre = (float)(rng.NextDouble() * 2.0 - 1.0) * BlockHalfWidth * 0.6f;
-            float clusterWidth = 3f + (float)rng.NextDouble() * 7f;
+            // Clustering. Two or three groups per row rather than one, and a floor of
+            // 0.06 rather than 0.35, so there are real bare stretches between them. With
+            // the old single wide cluster and a high floor the stand came out evenly
+            // sprinkled from end to end, which is the arrangement no photograph of a
+            // qualification ever shows.
+            int groups = 2 + rng.Next(2);
+            var centre = new float[groups];
+            var width = new float[groups];
+            for (int g = 0; g < groups; g++)
+            {
+                centre[g] = (float)(rng.NextDouble() * 2.0 - 1.0) * BlockHalfWidth * 0.85f;
+                width[g] = 1.6f + (float)rng.NextDouble() * 4.5f;
+            }
 
             for (float x = -BlockHalfWidth + SeatPitch * 0.5f + stagger; x <= BlockHalfWidth; x += SeatPitch)
             {
@@ -333,10 +354,14 @@ public static class AddAudience
                 if (n == 0 && x > 8.4f && x < 11.0f) continue;                        // wheelchair spaces (ISSF 6.4.1.6)
 
                 seats++;
-                Seat(b["audience_seat"], new Vector3(x, panY, z));
+                Seat(b["audience_seat"], new Vector3(x, panY, z), rng);
 
-                float near = Mathf.Exp(-Mathf.Pow((x - clusterCentre) / clusterWidth, 2f));
-                float chance = Occupancy * (0.35f + 1.3f * near);
+                float near = 0f;
+                for (int g = 0; g < groups; g++)
+                {
+                    near = Mathf.Max(near, Mathf.Exp(-Mathf.Pow((x - centre[g]) / width[g], 2f)));
+                }
+                float chance = Occupancy * (0.06f + 1.7f * near);
                 if (rng.NextDouble() > chance) continue;
 
                 people++;
@@ -346,70 +371,105 @@ public static class AddAudience
     }
 
     static Transform _people;
+    static Dictionary<string, List<CombineInstance>> _buckets;
     static List<Material> _skins;
-    static GameObject _rigged, _sitting, _standing;
+    static GameObject _rigged;
+    static GameObject[] _seated, _standingPoses;
     static RuntimeAnimatorController _controller;
 
     static void LoadPrefabs()
     {
-        // Force the prefabs off disk. SpectatorAssets may have rewritten them moments ago
-        // and Unity will happily hand back the copy it already had in memory, which is
-        // how 49 spectators ended up with a null animator controller although the prefab
-        // file on disk plainly referenced one.
+        // Force the rig prefab off disk. SpectatorAssets may have rewritten it moments
+        // ago and Unity will happily hand back the copy it already had in memory, which
+        // is how 49 spectators ended up with a null animator controller although the
+        // prefab file on disk plainly referenced one.
         AssetDatabase.ImportAsset(SpectatorAssets.RigPrefab, ImportAssetOptions.ForceUpdate);
         _rigged = AssetDatabase.LoadAssetAtPath<GameObject>(SpectatorAssets.RigPrefab);
-        _sitting = AssetDatabase.LoadAssetAtPath<GameObject>(SpectatorAssets.SitPrefab);
-        _standing = AssetDatabase.LoadAssetAtPath<GameObject>(SpectatorAssets.StandPrefab);
         _controller = AssetDatabase.LoadAssetAtPath<RuntimeAnimatorController>(
             SpectatorAssets.ControllerPath);
+        _seated = Load(SpectatorAssets.PosePrefabs(true));
+        _standingPoses = Load(SpectatorAssets.PosePrefabs(false));
         _skins = SpectatorAssets.BuildMaterials();
 
-        if (_rigged == null || _sitting == null || _standing == null || _skins.Count == 0)
+        if (_rigged == null || _seated.Length == 0 || _standingPoses.Length == 0 || _skins.Count == 0)
         {
             Debug.LogError("[Audience] spectator prefabs missing -- run " +
                            "Quest/12. Prepare the Spectators first");
         }
     }
 
+    static GameObject[] Load(string[] paths)
+    {
+        var list = new List<GameObject>();
+        foreach (var p in paths)
+        {
+            var go = AssetDatabase.LoadAssetAtPath<GameObject>(p);
+            if (go != null) list.Add(go);
+        }
+        return list.ToArray();
+    }
+
     /// <summary>
     /// Places one spectator on a seat.
     ///
-    /// The front rows get the rigged prefab, the rest a rigid pose. A share of the rigid
-    /// ones are standing, so the back of the stand is not a field of identical postures
-    /// and the whole crowd is not obviously one thing repeated -- the animated rows get
-    /// their variety from moving, and the rigid rows have to get it from the mesh.
+    /// EVERYTHING HERE IS A VARIETY KNOB, and that is the point. The first version of
+    /// this crowd put two hundred copies of one mesh in one posture on a perfect grid,
+    /// and the verdict was "not realistic". Looking at a native-resolution frame, the
+    /// loudest tell by a long way was not the stylised proportions -- it was that every
+    /// figure sat identically, in dead-straight rows, at identical spacing. So: eleven
+    /// baked seated poses and three standing ones, sixteen skins, a yaw spread wide
+    /// enough that people face slightly different ways, a few centimetres of positional
+    /// jitter so the rows are ragged, and a height spread that includes children.
     ///
-    /// These are deliberately NOT marked batching-static. Every one of them moves, and a
-    /// batching-static renderer that moves is both wrong and slower. Instancing on the
-    /// shared materials is what keeps the rigid tier cheap instead.
+    /// THREE PERFORMANCE TIERS. The front rows carry a rig and an Animator. The next
+    /// couple sway, which means they cannot be batched. Everything behind that is marked
+    /// batching-static, which lets Unity merge it into one draw call per skin -- and that
+    /// is what makes eleven poses free: batching groups by material, not by mesh, so the
+    /// pose count does not cost a thing.
     /// </summary>
     static void Person(Vector3 pan, int row, System.Random rng)
     {
-        if (_people == null || _rigged == null) return;
+        if (_people == null || _rigged == null || _seated.Length == 0) return;
 
         bool animated = row < AnimatedRows;
         bool standing = !animated && rng.NextDouble() < StandingShare;
-        var src = animated ? _rigged : (standing ? _standing : _sitting);
+        var src = animated ? _rigged
+                : standing ? _standingPoses[rng.Next(_standingPoses.Length)]
+                : _seated[rng.Next(_seated.Length)];
 
         var inst = (GameObject)PrefabUtility.InstantiatePrefab(src, _people);
-        inst.transform.rotation = Quaternion.Euler(0f, (float)(rng.NextDouble() * 18.0 - 9.0), 0f) * Facing;
 
+        // Wider than it looks: at a 0.52 m seat pitch, 16 degrees of yaw is most of the
+        // difference between "facing the range" and "facing the person next to you".
+        inst.transform.rotation =
+            Quaternion.Euler(0f, (float)(rng.NextDouble() * 32.0 - 16.0), 0f) * Facing;
+
+        // Height. Adults scatter about 7% either side, and roughly one in eleven
+        // spectators at a qualification is a child brought along by a parent.
+        float size = 0.93f + (float)rng.NextDouble() * 0.14f;
+        if (rng.NextDouble() < 0.09) size *= 0.76f + (float)rng.NextDouble() * 0.07f;
         // Safe to assign outright: SpectatorAssets wraps each model in a clean root and
         // keeps the import's x100 and its axis conversion on the child, precisely so this
         // line does not have to know about either. Assigning scale straight onto a raw
         // imported model is what left 132 spectators one centimetre tall and invisible.
-        inst.transform.localScale = Vector3.one * (0.94f + (float)rng.NextDouble() * 0.12f);
+        inst.transform.localScale = Vector3.one * size;
 
         // Feet on the tier, not the seat pan. A standing spectator steps forward off its
-        // own seat so it is not occupying the chair it is no longer sitting on.
+        // own seat so it is not occupying the chair it is no longer sitting on. The
+        // jitter is what breaks the grid: nobody sits dead centre on a plastic seat.
         float floorY = pan.y - SeatHeight;
         float forward = standing ? 0.22f : 0f;
-        inst.transform.position = new Vector3(pan.x, floorY, pan.z - forward);
+        inst.transform.position = new Vector3(
+            pan.x + (float)(rng.NextDouble() * 0.09 - 0.045),
+            floorY,
+            pan.z - forward + (float)(rng.NextDouble() * 0.10 - 0.05));
 
         foreach (var r in inst.GetComponentsInChildren<Renderer>())
         {
             r.sharedMaterial = _skins[rng.Next(_skins.Count)];
         }
+
+        bool sways = !animated && row < SwayRows;
 
         var spec = inst.GetComponent<Spectator>();
         if (spec != null)
@@ -421,20 +481,47 @@ public static class AddAudience
             {
                 spec.Rig.runtimeAnimatorController = _controller;
             }
-            // A spectator at the back is further from the player and may rock a touch
-            // more before it reads as a wobble rather than as weight shifting.
-            if (!animated) spec.SwayAngle = 1.1f + (float)rng.NextDouble() * 1.1f;
+            spec.SwayAngle = sways ? 1.1f + (float)rng.NextDouble() * 1.1f : 0f;
         }
 
-        GameObjectUtility.SetStaticEditorFlags(inst, StaticEditorFlags.OccludeeStatic);
+        // Batching-static ONLY for the figures that never move. A batching-static
+        // renderer that moves is both wrong and slower; but for the ones that hold
+        // still, this is what collapses 130-odd spectators into one draw call per skin
+        // and makes the eleven baked poses cost nothing at all, since Unity batches by
+        // material rather than by mesh.
+        var flags = StaticEditorFlags.OccludeeStatic;
+        if (!animated && !sways) flags |= StaticEditorFlags.BatchingStatic;
+        GameObjectUtility.SetStaticEditorFlags(inst, flags);
     }
 
 
-    static void Seat(List<CombineInstance> b, Vector3 pan)
+    /// <summary>
+    /// One seat, and occasionally a coat left over its back or a bag on the deck in front
+    /// of it. The props cost two boxes each and go through the same combine as everything
+    /// else, so the whole lot is two extra draw calls -- cheap for something that reads
+    /// as "people have been sitting here" rather than "seats have been instantiated".
+    /// </summary>
+    static void Seat(List<CombineInstance> b, Vector3 pan, System.Random rng)
     {
         var rot = Quaternion.Euler(0f, 180f, 0f);
         Local(b, pan, rot, new Vector3(0f, -0.03f, 0f), new Vector3(0.46f, 0.06f, 0.44f));
         Local(b, pan, rot, new Vector3(0f, 0.24f, -0.22f), new Vector3(0.46f, 0.48f, 0.06f));
+
+        if (_buckets == null) return;
+
+        if (rng.NextDouble() < 0.06)
+        {
+            float w = 0.34f + (float)rng.NextDouble() * 0.10f;
+            Local(_buckets["audience_coat"], pan, rot,
+                  new Vector3((float)(rng.NextDouble() * 0.08 - 0.04), 0.30f, -0.25f),
+                  new Vector3(w, 0.42f, 0.09f));
+        }
+        if (rng.NextDouble() < 0.05)
+        {
+            Local(_buckets["audience_bag"], pan, rot,
+                  new Vector3((float)(rng.NextDouble() * 0.16 - 0.08), -0.33f, 0.30f),
+                  new Vector3(0.26f, 0.22f, 0.17f));
+        }
     }
 
     static void Local(List<CombineInstance> b, Vector3 origin, Quaternion rot, Vector3 localPos, Vector3 size)
@@ -452,6 +539,7 @@ public static class AddAudience
         Object.DestroyImmediate(go);
         return _cube;
     }
+
 
     static void Box(List<CombineInstance> b, Vector3 centre, Vector3 size, Quaternion rot)
     {

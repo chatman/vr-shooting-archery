@@ -26,8 +26,13 @@ using UnityEngine;
 /// </summary>
 public class Spectator : MonoBehaviour
 {
-    /// <summary>Seated idles the controller carries: three idles plus applause.</summary>
-    public const int SeatedActs = 4;
+    /// <summary>
+    /// Seated acts the controller carries: five idles plus applause. They deliberately do
+    /// not share a leg posture, so a spectator changing act also changes how it is
+    /// sitting -- upright, forward on its knees, arms folded, one ankle over a knee,
+    /// slumped back. Must match SpectatorAssets.SeatedStates.
+    /// </summary>
+    public const int SeatedActs = 6;
 
     static readonly int ActHash = Animator.StringToHash("Act");
     static readonly int StandHash = Animator.StringToHash("Stand");

@@ -57,7 +57,7 @@
 # Verified reproducible: re-running this writes the three FBXs byte for byte.
 
 import bpy, sys, os, math
-from mathutils import Vector, Matrix
+from mathutils import Vector, Matrix, Quaternion
 
 argv = sys.argv[sys.argv.index("--") + 1:]
 SRC, OUT = argv[0], argv[1]
@@ -72,7 +72,10 @@ HEAD_DROP = 0.22       # raw import units; closes the neck gap the shrink opens
 # ---------------------------------------------------------------- pose vocabulary
 
 def mirror(d):
-    """Same direction on the other side of the body."""
+    """Same direction on the other side of the body. A fourth element is a twist about
+    the bone's own axis, which mirrors by negating too."""
+    if len(d) > 3:
+        return (-d[0], d[1], d[2], -d[3])
     return (-d[0], d[1], d[2])
 
 
@@ -82,6 +85,18 @@ def side(**kw):
     for bone, d in kw.items():
         out["Left" + bone] = d
         out["Right" + bone] = mirror(d)
+    return out
+
+
+def twisted(pose, **kw):
+    """Adds a twist, in degrees, about the named bones' own axes, keeping each bone
+    pointing where it already points. Direction alone cannot express a twist -- a spine
+    that stays vertical while the shoulders rotate is pure roll about the bone axis --
+    so turning to a neighbour needs this and nothing else will do it."""
+    out = dict(pose)
+    for bone, deg in kw.items():
+        d = out.get(bone, (0.0, 0.0, 1.0))
+        out[bone] = (d[0], d[1], d[2], deg)
     return out
 
 
@@ -100,6 +115,106 @@ STAND = dict(
     **side(UpLeg=(0.05, 0.0, -1.0), Leg=(0.0, 0.03, -1.0), Foot=(0.02, -0.80, -0.52),
            Arm=(0.17, 0.0, -1.0), ForeArm=(0.13, -0.16, -0.98), Hand=(0.11, -0.22, -0.97)),
 )
+
+# ---------------------------------------------------------------- the pose library
+#
+# WHY THERE ARE ELEVEN OF THESE. The first crowd had one seated pose for all two hundred
+# spectators, and the verdict on it was "not realistic". Looking at a native-resolution
+# frame, the loudest tell by a distance was not the stylised proportions -- it was that
+# every figure sat in the identical posture, with the identical arms at the identical
+# angle, in dead-straight rows. A stylised crowd reads as convincing when it is varied;
+# no crowd reads as convincing when it is one body repeated.
+#
+# These are the postures you actually see in a half-full qualification stand: people
+# folded up against the air conditioning, leaning forward through a close series, turned
+# round talking to the row behind, slumped with their legs out, one ankle over a knee,
+# looking at a phone. Each is baked to its own rigless mesh for the distant rows, and
+# five of them are also the basis of a seated idle clip for the rows near enough to see
+# move.
+
+def _sit(**kw):
+    """A seated pose: the neutral one with the named bones overridden."""
+    out = dict(SIT)
+    out.update(kw)
+    return out
+
+
+
+SIT_FORWARD = _sit(
+    Spine=(0, -0.34, 1.0), Chest=(0, -0.16, 1.0), Neck=(0, 0.18, 1.0), Head=(0, 0.12, 1.0),
+    **side(ForeArm=(0.16, -0.52, -0.84), Hand=(0.14, -0.60, -0.78)))
+
+SIT_FOLDED = _sit(
+    **side(Arm=(0.22, -0.34, -0.91), ForeArm=(-0.72, -0.66, 0.20), Hand=(-0.78, -0.56, 0.18)))
+
+# Slumped back with the legs out. The leg angles are solved, not styled: pushing the
+# feet forward shortens the leg's vertical reach, and the thigh angle has to give that
+# back or the hip ends up above the seat pan and the figure floats. The first attempt
+# measured a 0.581 hip against the neutral pose's 0.470 and hovered 110 mm over the seat.
+SIT_SLOUCH = _sit(
+    Spine=(0, 0.22, 1.0), Chest=(0, 0.10, 1.0), UpperChest=(0, 0.04, 1.0),
+    Neck=(0, -0.10, 1.0), Head=(0, -0.04, 1.0),
+    **side(UpLeg=(0.18, -0.97, 0.10), Leg=(0.02, -0.33, -0.94), Foot=(0.03, -0.70, -0.45),
+           Arm=(0.26, 0.10, -0.96), ForeArm=(0.16, -0.40, -0.90), Hand=(0.14, -0.50, -0.85)))
+
+# One ankle over the opposite knee. Asymmetric on purpose: a crowd of symmetrical people
+# is its own kind of tell. The shin has to travel INWARD across the other leg -- aimed
+# straight out to the side it read as a kick rather than as crossed legs.
+SIT_CROSSED = _sit(
+    LeftUpLeg=(0.45, -0.85, 0.18), LeftLeg=(-0.55, -0.55, -0.63), LeftFoot=(-0.62, -0.46, -0.64),
+    LeftArm=(0.26, -0.04, -0.98), LeftForeArm=(-0.22, -0.70, -0.68), LeftHand=(-0.32, -0.74, -0.58))
+
+SIT_WIDE = _sit(
+    **side(UpLeg=(0.42, -0.88, 0.15), Leg=(0.10, 0.16, -1.0), Foot=(0.14, -0.78, -0.34),
+           ForeArm=(0.30, -0.62, -0.72), Hand=(0.32, -0.70, -0.64)))
+
+SIT_LAP = _sit(
+    **side(UpLeg=(0.06, -0.99, 0.15),
+           Arm=(0.18, 0.06, -0.98), ForeArm=(-0.18, -0.72, -0.67), Hand=(-0.28, -0.80, -0.52)))
+
+SIT_PHONE = _sit(
+    Neck=(0, 0.18, 1.0), Head=(0, 0.16, 0.99),
+    **side(Arm=(0.28, -0.20, -0.94), ForeArm=(-0.22, -0.86, 0.24), Hand=(-0.26, -0.90, 0.18)))
+
+SIT_LEAN = _sit(
+    Spine=(0.14, -0.10, 0.98), Chest=(0.08, -0.05, 1.0), Neck=(-0.04, 0.04, 1.0),
+    Head=(-0.08, 0.01, 1.0),
+    LeftArm=(0.44, -0.10, -0.89), LeftForeArm=(0.30, -0.60, -0.74), LeftHand=(0.30, -0.68, -0.68))
+
+# Turned to a neighbour. The spine chain twists a little at each joint, which is how a
+# torso actually turns -- all of it at the waist reads as a doll on a spindle.
+SIT_TURN_L = twisted(SIT, Spine=9, Chest=11, UpperChest=9, Neck=8, Head=11)
+SIT_TURN_R = twisted(SIT, Spine=-9, Chest=-11, UpperChest=-9, Neck=-8, Head=-11)
+
+STAND_FOLDED = dict(STAND)
+STAND_FOLDED.update(
+    side(Arm=(0.20, -0.30, -0.93), ForeArm=(-0.74, -0.64, 0.18), Hand=(-0.80, -0.54, 0.16)))
+
+STAND_HIPS = dict(STAND)
+STAND_HIPS.update(
+    side(Arm=(0.30, -0.08, -0.95), ForeArm=(-0.52, -0.28, -0.81), Hand=(-0.62, -0.28, -0.74)))
+
+# name -> pose. The names become the Unity prefab names, so keep them stable.
+SEATED = [
+    ("sit_neutral", SIT),
+    ("sit_forward", SIT_FORWARD),
+    ("sit_folded", SIT_FOLDED),
+    ("sit_slouch", SIT_SLOUCH),
+    ("sit_crossed", SIT_CROSSED),
+    ("sit_wide", SIT_WIDE),
+    ("sit_lap", SIT_LAP),
+    ("sit_phone", SIT_PHONE),
+    ("sit_lean", SIT_LEAN),
+    ("sit_turn_l", SIT_TURN_L),
+    ("sit_turn_r", SIT_TURN_R),
+]
+
+STANDING = [
+    ("stand_neutral", STAND),
+    ("stand_folded", STAND_FOLDED),
+    ("stand_hips", STAND_HIPS),
+]
+
 
 def blend(a, b, t):
     out = dict(a)
@@ -212,11 +327,12 @@ def depth(bone):
 def aim(pb, d):
     """Point the bone along d (armature space), keeping its head where the parent chain
     put it. Twist carries over from the bone's current matrix so repeated aims do not
-    spin the elbow."""
+    spin the elbow; a fourth element in d adds an explicit twist in degrees."""
     bpy.context.view_layer.update()
     m = pb.matrix.copy()
     head = m.translation.copy()
-    y = Vector(d).normalized()
+    roll = d[3] if len(d) > 3 else 0.0
+    y = Vector(d[:3]).normalized()
     ref = Vector(m.col[2][:3])
     x = ref.cross(y)
     if x.length < 1e-4:
@@ -230,9 +346,39 @@ def aim(pb, d):
     z = x.cross(y)
     nm = Matrix(((x.x, y.x, z.x, 0.0), (x.y, y.y, z.y, 0.0), (x.z, y.z, z.z, 0.0),
                  (0.0, 0.0, 0.0, 1.0)))
+    if roll:
+        # Post-multiply, so the rotation is about the bone's OWN axis rather than the
+        # armature's. Applied before the translation goes in, because a 4x4 rotation
+        # would otherwise carry the head position through the multiply.
+        nm = nm @ Matrix.Rotation(math.radians(roll), 4, 'Y')
     nm.translation = head
     pb.matrix = nm
     bpy.context.view_layer.update()
+
+
+# A relaxed hand, applied to every pose. These are not decoration.
+#
+# The rig's finger chain is 180 mm long -- nearly as long as the forearm -- because the
+# original is a chibi with mitten hands and oversized bones. Left in its rest pose it
+# continues dead straight out of the wrist, so a pose with the forearms crossed over the
+# chest sends each hand's fingers 470 mm out past the far side of the body. Measured,
+# not guessed: the folded-arms pose came out 860 mm wide against a 440 mm torso, and
+# from the front it read as a scarecrow. Every arm bone was pointing exactly where it
+# had been asked to; the fingers were the whole of the error.
+FINGER_CURL = {"Index1": 42.0, "Index2": 46.0, "Index3": 38.0, "Thumb1": 28.0, "Thumb2": 30.0}
+
+
+def curl_fingers(arm):
+    """Folds the finger bones toward the palm, about each bone's own bending axis."""
+    for pb in arm.pose.bones:
+        for key, deg in FINGER_CURL.items():
+            if key in pb.name and not pb.name.endswith("_end"):
+                # The bending axis mirrors with the hand, so the right side curls the
+                # other way round. With one sign for both, the right hand's fingers
+                # bent backwards and stayed almost as far out as they started.
+                sign = -1.0 if pb.name.startswith("Right") else 1.0
+                pb.rotation_quaternion = Quaternion((1.0, 0.0, 0.0), math.radians(sign * deg))
+                break
 
 
 def apply_pose(arm, pose):
@@ -240,6 +386,7 @@ def apply_pose(arm, pose):
         pb.rotation_quaternion = (1, 0, 0, 0)
         pb.location = (0, 0, 0)
         pb.scale = (1, 1, 1)
+    curl_fingers(arm)
     bpy.context.view_layer.update()
     # Parents first: aim() reads the bone's current head, which the parent decides.
     for pb in sorted(arm.pose.bones, key=lambda p: depth(p.bone)):
@@ -295,6 +442,14 @@ def breath(p, k):
 
 
 def clips(arm):
+    """
+    Six seated idles, and they deliberately do not share a leg posture. The spectators
+    near enough to carry a rig are the ones whose repetition is most visible, and an
+    Animator that only ever varies the arms leaves forty-nine identical pairs of legs in
+    the front two rows. Act changes every seven to sixteen seconds, so a spectator
+    shifting from crossed legs to slouched to upright over a session is itself the kind
+    of thing a real person does in a seat.
+    """
     s = SIT
 
     # A: quiet. Breathing, one slow look left and back.
@@ -306,20 +461,14 @@ def clips(arm):
     ])
 
     # B: leans forward onto the knees for a while, the way people watch a close final.
-    fwd = tweak(s, Spine=(0, -0.34, 1.0), Chest=(0, -0.16, 1.0), Neck=(0, 0.18, 1.0),
-                Head=(0, 0.12, 1.0),
-                LeftForeArm=(0.16, -0.52, -0.84), RightForeArm=(-0.16, -0.52, -0.84),
-                LeftHand=(0.14, -0.60, -0.78), RightHand=(-0.14, -0.60, -0.78))
+    fwd = SIT_FORWARD
     make_action(arm, "SitIdleB", [
         (0, s), (30, blend(s, fwd, 0.55)), (54, fwd), (96, breath(fwd, 1)),
         (120, fwd), (150, blend(s, fwd, 0.35)), (168, s),
     ])
 
     # C: arms folded, turns to the neighbour and back.
-    fold = tweak(s,
-                 LeftArm=(0.34, -0.30, -0.89), RightArm=(-0.34, -0.30, -0.89),
-                 LeftForeArm=(-0.86, -0.46, 0.22), RightForeArm=(0.86, -0.46, 0.22),
-                 LeftHand=(-0.92, -0.32, 0.22), RightHand=(0.92, -0.32, 0.22))
+    fold = SIT_FOLDED
     make_action(arm, "SitIdleC", [
         (0, fold), (48, breath(fold, 1)),
         (84, tweak(fold, Head=(-0.42, 0.02, 0.90), Neck=(-0.16, 0.04, 1.0),
@@ -327,6 +476,24 @@ def clips(arm):
         (120, tweak(fold, Head=(-0.38, 0.0, 0.92), Neck=(-0.14, 0.04, 1.0),
                     UpperChest=(-0.09, 0.0, 1.0))),
         (156, breath(fold, 0.4)), (216, fold),
+    ])
+
+    # D: one ankle over a knee, turning to talk to the row behind and back.
+    cross = SIT_CROSSED
+    make_action(arm, "SitIdleD", [
+        (0, cross), (54, breath(cross, 1)),
+        (96, twisted(cross, Spine=7, Chest=9, UpperChest=7, Neck=6, Head=9)),
+        (138, twisted(cross, Spine=6, Chest=8, UpperChest=6, Neck=6, Head=8)),
+        (180, breath(cross, 0.5)), (228, cross),
+    ])
+
+    # E: slumped back with the legs out, shifting weight once.
+    slump = SIT_SLOUCH
+    make_action(arm, "SitIdleE", [
+        (0, slump), (60, breath(slump, 1)),
+        (108, tweak(slump, Spine=(0.09, 0.22, 1.0), Chest=(0.05, 0.10, 1.0),
+                    Head=(-0.06, -0.04, 1.0))),
+        (156, breath(slump, 0.4)), (204, slump),
     ])
 
     # Applause: four claps in two seconds, hands meeting in front of the chest.
@@ -389,6 +556,7 @@ def bake_static(arm, mesh, pose, name):
     """Applies a pose to the mesh and writes it rigless, for the distant rows."""
     apply_pose(arm, pose)
     bpy.context.view_layer.update()
+    hip = (arm.matrix_world @ arm.pose.bones["Hips"].head).z
 
     dg = bpy.context.evaluated_depsgraph_get()
     ev = mesh.evaluated_get(dg)
@@ -411,12 +579,17 @@ def bake_static(arm, mesh, pose, name):
         v.co = Vector((v.co.x - xm, v.co.y - ym, v.co.z - zl))
     obj.data.update()
 
+    # Hip height above the mesh's lowest point is the number that decides whether the
+    # figure sits ON the 0.45 m seat pan or floats over it / sinks through it. Every
+    # seated pose has to land near the neutral one's 0.47, and the only way to know is
+    # to measure it.
     pts = [v.co for v in obj.data.vertices]
-    print("[rig] static %-16s w=%.2f d=%.2f h=%.2f tris=%d" % (
+    print("[rig] static %-22s w=%.2f d=%.2f h=%.2f hip=%.3f tris=%d" % (
         name,
         max(p.x for p in pts) - min(p.x for p in pts),
         max(p.y for p in pts) - min(p.y for p in pts),
         max(p.z for p in pts) - min(p.z for p in pts),
+        hip - zl,
         sum(len(p.vertices) - 2 for p in obj.data.polygons)))
 
     path = os.path.join(OUT, name + ".fbx")
@@ -454,8 +627,8 @@ print("[rig] reshaped height %.3f -> scaled by %.4f" % (raw, k))
 report(arm, mesh, STAND, "stand")
 report(arm, mesh, SIT, "sit")
 
-bake_static(arm, mesh, SIT, "spectator_sit")
-bake_static(arm, mesh, STAND, "spectator_stand")
+for _name, _pose in SEATED + STANDING:
+    bake_static(arm, mesh, _pose, "spectator_" + _name)
 
 clips(arm)
 

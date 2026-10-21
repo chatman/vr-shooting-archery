@@ -27,20 +27,59 @@ public static class SpectatorAssets
 {
     public const string Dir = "Assets/Models/Spectator";
     public const string RigFbx = Dir + "/spectator.fbx";
-    public const string SitFbx = Dir + "/spectator_sit.fbx";
-    public const string StandFbx = Dir + "/spectator_stand.fbx";
     public const string TextureDir = Dir + "/Textures";
     public const string MaterialDir = Dir + "/Materials";
     public const string ControllerPath = Dir + "/Spectator.controller";
     public const string RigPrefab = Dir + "/Spectator_Rigged.prefab";
-    public const string SitPrefab = Dir + "/Spectator_Sitting.prefab";
-    public const string StandPrefab = Dir + "/Spectator_Standing.prefab";
 
     /// <summary>Clips that loop. The two transitions are the ones that must not.</summary>
-    static readonly string[] Looping = { "SitIdleA", "SitIdleB", "SitIdleC", "SitClap", "StandIdle" };
+    static readonly string[] Looping =
+        { "SitIdleA", "SitIdleB", "SitIdleC", "SitIdleD", "SitIdleE", "SitClap", "StandIdle" };
 
-    /// <summary>Act 0..3 pick these; the Spectator component sets Act at random.</summary>
-    static readonly string[] SeatedStates = { "SitIdleA", "SitIdleB", "SitIdleC", "SitClap" };
+    /// <summary>Act 0..5 pick these; the Spectator component sets Act at random.</summary>
+    static readonly string[] SeatedStates =
+        { "SitIdleA", "SitIdleB", "SitIdleC", "SitIdleD", "SitIdleE", "SitClap" };
+
+    /// <summary>
+    /// The baked poses, discovered rather than listed, so adding one to
+    /// scripts/build_spectator.py and re-exporting is the whole of the change. Seated and
+    /// standing are told apart by the filename, which is also how the audience builder
+    /// decides which list to draw from.
+    /// </summary>
+    public static string[] PosePrefabs(bool seated)
+    {
+        var want = seated ? "spectator_sit_" : "spectator_stand_";
+        var found = new List<string>();
+        foreach (var path in AssetDatabase.FindAssets("t:Prefab", new[] { Dir }))
+        {
+            var p = AssetDatabase.GUIDToAssetPath(path);
+            if (System.IO.Path.GetFileName(p).StartsWith(PrefabName(want))) found.Add(p);
+        }
+        found.Sort(string.CompareOrdinal);
+        return found.ToArray();
+    }
+
+    static string PrefabName(string fbxStem)
+    {
+        // spectator_sit_folded -> Spectator_sit_folded, which is what MakePrefab writes.
+        return "Spectator_" + fbxStem.Substring("spectator_".Length);
+    }
+
+    static string[] PoseFbxs()
+    {
+        var found = new List<string>();
+        foreach (var guid in AssetDatabase.FindAssets("t:Model", new[] { Dir }))
+        {
+            var p = AssetDatabase.GUIDToAssetPath(guid);
+            var stem = System.IO.Path.GetFileNameWithoutExtension(p);
+            if (stem.StartsWith("spectator_sit_") || stem.StartsWith("spectator_stand_"))
+            {
+                found.Add(p);
+            }
+        }
+        found.Sort(string.CompareOrdinal);
+        return found.ToArray();
+    }
 
     [MenuItem("Quest/12. Prepare the Spectators")]
     public static void Build()
@@ -51,15 +90,22 @@ public static class SpectatorAssets
         }
 
         ImportRig();
-        ImportStatic(SitFbx);
-        ImportStatic(StandFbx);
+        var poses = PoseFbxs();
+        foreach (var p in poses) ImportStatic(p);
+
         var mats = BuildMaterials();
         var controller = BuildController();
-        BuildPrefabs(controller, mats[0]);
+
+        MakePrefab(RigFbx, RigPrefab, controller, mats[0]);
+        foreach (var p in poses)
+        {
+            var stem = System.IO.Path.GetFileNameWithoutExtension(p);
+            MakePrefab(p, Dir + "/" + PrefabName(stem) + ".prefab", null, mats[0]);
+        }
 
         AssetDatabase.SaveAssets();
-        Debug.Log("[Spectator] " + mats.Count + " materials, " + SeatedStates.Length +
-                  " seated acts, controller at " + ControllerPath);
+        Debug.Log("[Spectator] " + mats.Count + " skins, " + poses.Length + " baked poses, " +
+                  SeatedStates.Length + " seated acts, controller at " + ControllerPath);
     }
 
     // ------------------------------------------------------------------ import
@@ -256,13 +302,6 @@ public static class SpectatorAssets
     }
 
     // ------------------------------------------------------------------ prefabs
-
-    static void BuildPrefabs(AnimatorController controller, Material defaultMat)
-    {
-        MakePrefab(RigFbx, RigPrefab, controller, defaultMat);
-        MakePrefab(SitFbx, SitPrefab, null, defaultMat);
-        MakePrefab(StandFbx, StandPrefab, null, defaultMat);
-    }
 
     /// <summary>
     /// Wraps the imported model in a clean root and normalises it there: upright, facing
