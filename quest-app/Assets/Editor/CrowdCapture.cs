@@ -112,6 +112,10 @@ public class CrowdStills : MonoBehaviour
         new Shot("07_from_above",     new Vector3(0f, 5.40f, 20.5f),   new Vector3(52f, 0f, 0f), 55f),
         new Shot("08_up_the_aisle",   new Vector3(6.5f, 1.60f, 17.2f), new Vector3(9f, 0f, 0f), 58f),
         new Shot("09_spectators_view", new Vector3(0f, 3.60f, 28.2f),  new Vector3(7f, 180f, 0f), 70f),
+        // The athletes' passage: standing in the doorway looking down it to the range,
+        // and from the range looking back up it at the gate in the barrier.
+        new Shot("10_passage_from_door", new Vector3(-10.5f, 1.62f, 29.6f), new Vector3(2f, 180f, 0f), 62f),
+        new Shot("11_passage_from_range", new Vector3(-10.5f, 1.62f, 13.5f), new Vector3(-2f, 0f, 0f), 58f),
     };
 
     string _dir;

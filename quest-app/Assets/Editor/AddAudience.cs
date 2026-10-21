@@ -131,6 +131,25 @@ public static class AddAudience
     /// <summary>Share of the rigid tier placed on its feet rather than seated.</summary>
     const float StandingShare = 0.08f;
 
+    // ---- athletes' passage ----
+    //
+    // The hall's only way in is the glazed rear wall, and the stand is built across the
+    // whole of it, so athletes have to come through the seating. The hall model carries
+    // four glass doors at z = 30, 1.16 m wide, centred on x = -10.5, -4.5, +4.5 and
+    // +10.5 -- measured off door_glass, not assumed. This passage lines up with the
+    // outermost one on the left: the two inner doors sit within a metre of the audience
+    // aisles at x = +/-6.5 and would leave a sliver of stand one seat wide between
+    // passage and aisle, where -10.5 leaves 2.7 m of seating on one side and 4.8 m on
+    // the other. It is also where a players' tunnel belongs -- off to the side, not
+    // through the middle of the crowd.
+    //
+    // The passage runs at hall floor level the whole way, so it is a trench cut through
+    // the rake: 0.45 m deep at the front row and 2.44 m by the rear walkway. That is how
+    // a vomitory works, and it keeps the athletes out of the spectators' deck entirely.
+    const float PassageX = -10.5f;
+    const float PassageHalf = 0.70f;        // 1.40 m clear, against a 1.16 m door
+    const float RailHeight = 0.95f;
+
     /// <summary>
     /// Turns a spectator to look at the firing points, which are downrange of the stand
     /// at -Z.
@@ -286,15 +305,29 @@ public static class AddAudience
         return y;
     }
 
+    /// <summary>
+    /// One tier, as two slabs with the athletes' passage between them. The slabs are
+    /// solid boxes, so their cut faces ARE the walls of the passage and nothing else has
+    /// to be built to retain the deck.
+    /// </summary>
+    static void Tier(List<CombineInstance> b, float height, float z0, float depth)
+    {
+        Slab(b, -BlockHalfWidth, PassageX - PassageHalf, height, z0, depth);
+        Slab(b, PassageX + PassageHalf, BlockHalfWidth, height, z0, depth);
+    }
+
+    static void Slab(List<CombineInstance> b, float x0, float x1, float height, float z0, float depth)
+    {
+        if (x1 - x0 < 0.02f) return;
+        Box(b, new Vector3((x0 + x1) * 0.5f, height * 0.5f, z0 + depth * 0.5f),
+            new Vector3(x1 - x0, height, depth), Quaternion.identity);
+    }
+
     static void BuildDeck(Dictionary<string, List<CombineInstance>> b, float[] tierY)
     {
         for (int n = 0; n < RowCount; n++)
         {
-            float z0 = FrontRowZ + n * RowDepth;
-            Box(b["audience_deck"],
-                new Vector3(0f, tierY[n] * 0.5f, z0 + RowDepth * 0.5f),
-                new Vector3(BlockHalfWidth * 2f, tierY[n], RowDepth),
-                Quaternion.identity);
+            Tier(b["audience_deck"], tierY[n], FrontRowZ + n * RowDepth, RowDepth);
         }
 
         // Rear walkway, level with the back row, out to just short of the glass.
@@ -302,11 +335,10 @@ public static class AddAudience
         float walk = (GlassZ - 1f) - backZ;
         if (walk > 0.1f)
         {
-            Box(b["audience_deck"],
-                new Vector3(0f, tierY[RowCount - 1] * 0.5f, backZ + walk * 0.5f),
-                new Vector3(BlockHalfWidth * 2f, tierY[RowCount - 1], walk),
-                Quaternion.identity);
+            Tier(b["audience_deck"], tierY[RowCount - 1], backZ, walk);
         }
+
+        BuildPassageRail(b, tierY);
 
         // Aisle steps: half a tier each, so the climb is walkable rather than a vault.
         float[] aisles = { -AisleCentre, AisleCentre };
@@ -324,14 +356,77 @@ public static class AddAudience
         }
     }
 
+    /// <summary>
+    /// A handrail down each side of the passage, following the rake in steps.
+    ///
+    /// Not decoration: by the back of the stand the passage is a 2.44 m trench with
+    /// spectators sitting along the lip of it, and a stand that drops two and a half
+    /// metres beside a walkway with nothing to hold is the one detail that would make
+    /// the whole thing read as a model rather than a building. Dropped for the front two
+    /// rows, where the fall is under 0.6 m and a rail would be clutter.
+    /// </summary>
+    static void BuildPassageRail(Dictionary<string, List<CombineInstance>> b, float[] tierY)
+    {
+        var rail = b["audience_rail"];
+        float[] sides = { PassageX - PassageHalf - 0.04f, PassageX + PassageHalf + 0.04f };
+        float backZ = FrontRowZ + RowCount * RowDepth;
+
+        foreach (float sx in sides)
+        {
+            for (int n = 2; n < RowCount; n++)
+            {
+                float z0 = FrontRowZ + n * RowDepth;
+                float top = tierY[n] + RailHeight;
+                Box(rail, new Vector3(sx, top, z0 + RowDepth * 0.5f),
+                    new Vector3(0.05f, 0.05f, RowDepth), Quaternion.identity);
+                Box(rail, new Vector3(sx, tierY[n] + RailHeight * 0.5f, z0 + RowDepth * 0.5f),
+                    new Vector3(0.05f, RailHeight, 0.05f), Quaternion.identity);
+            }
+
+            // Along the rear walkway, where it is deepest.
+            float walk = (GlassZ - 1f) - backZ;
+            if (walk > 0.1f)
+            {
+                float top = tierY[RowCount - 1] + RailHeight;
+                Box(rail, new Vector3(sx, top, backZ + walk * 0.5f),
+                    new Vector3(0.05f, 0.05f, walk), Quaternion.identity);
+                for (float z = backZ + 0.3f; z < backZ + walk; z += 0.9f)
+                {
+                    Box(rail, new Vector3(sx, tierY[RowCount - 1] + RailHeight * 0.5f, z),
+                        new Vector3(0.05f, RailHeight, 0.05f), Quaternion.identity);
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// The ISSF barrier, with a gate where the passage comes through. The two horizontal
+    /// rails stop either side of the opening and get an upright at each cut end, which is
+    /// what makes it read as a way through rather than as a missing piece of fence.
+    /// </summary>
     static void BuildBarrier(Dictionary<string, List<CombineInstance>> b)
     {
-        float w = BlockHalfWidth * 2f;
-        Box(b["audience_rail"], new Vector3(0f, BarrierHeight - 0.03f, BarrierZ), new Vector3(w, 0.06f, 0.06f), Quaternion.identity);
-        Box(b["audience_rail"], new Vector3(0f, BarrierHeight * 0.5f, BarrierZ), new Vector3(w, 0.05f, 0.05f), Quaternion.identity);
+        float gateL = PassageX - PassageHalf;
+        float gateR = PassageX + PassageHalf;
+        float[,] runs = { { -BlockHalfWidth, gateL }, { gateR, BlockHalfWidth } };
+
+        for (int i = 0; i < 2; i++)
+        {
+            float x0 = runs[i, 0], x1 = runs[i, 1];
+            float mid = (x0 + x1) * 0.5f, len = x1 - x0;
+            if (len < 0.05f) continue;
+            Box(b["audience_rail"], new Vector3(mid, BarrierHeight - 0.03f, BarrierZ), new Vector3(len, 0.06f, 0.06f), Quaternion.identity);
+            Box(b["audience_rail"], new Vector3(mid, BarrierHeight * 0.5f, BarrierZ), new Vector3(len, 0.05f, 0.05f), Quaternion.identity);
+        }
+
         for (float x = -BlockHalfWidth; x <= BlockHalfWidth + 0.01f; x += 2.5f)
         {
+            if (x > gateL - 0.2f && x < gateR + 0.2f) continue;      // not inside the gate
             Box(b["audience_rail"], new Vector3(x, BarrierHeight * 0.5f, BarrierZ), new Vector3(0.06f, BarrierHeight, 0.06f), Quaternion.identity);
+        }
+        foreach (float x in new[] { gateL, gateR })
+        {
+            Box(b["audience_rail"], new Vector3(x, BarrierHeight * 0.5f, BarrierZ), new Vector3(0.08f, BarrierHeight, 0.08f), Quaternion.identity);
         }
     }
 
@@ -373,6 +468,11 @@ public static class AddAudience
             {
                 if (Mathf.Abs(Mathf.Abs(x) - AisleCentre) < AisleHalf) continue;      // aisles
                 if (n == 0 && x > 8.4f && x < 11.0f) continue;                        // wheelchair spaces (ISSF 6.4.1.6)
+                // Most of a pitch of margin either side, not half. Half kept the seat pan
+                // clear of the void but still let the widest poses -- folded arms at
+                // 0.70 m across, knees apart at 0.75 -- put an elbow or a knee through
+                // the passage handrail.
+                if (Mathf.Abs(x - PassageX) < PassageHalf + SeatPitch * 0.8f) continue;
 
                 seats++;
                 Seat(b["audience_seat"], new Vector3(x, panY, z), rng);
