@@ -329,7 +329,14 @@ public static class AddAudience
         {
             float tier = tierY[n];
             float panY = tier + SeatHeight;
-            float z = FrontRowZ + n * RowDepth + RowDepth * 0.62f;
+            // 0.70 of the tread, not 0.55 as it started. The seat has to sit far enough
+            // back that the DEEPEST pose still has its feet on the deck: a slouched
+            // spectator reaches 0.55 m forward of its hip against the neutral pose's
+            // 0.37, and at 0.55 of the tread those feet hung over the edge of the tier
+            // with the next row's seats under them. 0.70 puts the hip 0.63 m from the
+            // front edge, which leaves 80 mm of deck in front of the longest legs and
+            // still clears the back of the tread by 50 mm.
+            float z = FrontRowZ + n * RowDepth + RowDepth * 0.70f;
 
             // Stagger alternate rows half a pitch: this is what makes C = 60 mm honest.
             float stagger = (n % 2 == 0) ? 0f : SeatPitch * 0.5f;
@@ -505,7 +512,12 @@ public static class AddAudience
     {
         var rot = Quaternion.Euler(0f, 180f, 0f);
         Local(b, pan, rot, new Vector3(0f, -0.03f, 0f), new Vector3(0.46f, 0.06f, 0.44f));
-        Local(b, pan, rot, new Vector3(0f, 0.24f, -0.22f), new Vector3(0.46f, 0.48f, 0.06f));
+        // A 0.38 m back, not 0.48. These figures carry a shorter torso than a person --
+        // reproportioning them gave the height to the legs -- so their shoulder sits only
+        // 0.55 m above the pan. Against a 0.48 m back that left every spectator buried to
+        // the chin and the stand reading as a rack of blue panels with heads on top.
+        // Low-backed plastic seats are what a qualification hall has anyway.
+        Local(b, pan, rot, new Vector3(0f, 0.19f, -0.22f), new Vector3(0.46f, 0.38f, 0.06f));
 
         if (_buckets == null) return;
 
