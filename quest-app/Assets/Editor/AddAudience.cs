@@ -132,12 +132,26 @@ public static class AddAudience
     const float StandingShare = 0.08f;
 
     /// <summary>
-    /// The spectators face the firing line. Nothing else: the FBXs come out of Blender's
-    /// exporter with its default axis conversion and import Y-up at 1:1, which the
-    /// measured prefab bounds in SpectatorAssets.Build confirm. The MakeHuman figures
-    /// this replaces needed a -90 about X; these do not.
+    /// Turns a spectator to look at the firing points, which are downrange of the stand
+    /// at -Z.
+    ///
+    /// IDENTITY, not a 180 yaw. These prefabs look along their own -Z: the normalising
+    /// step in SpectatorAssets stands the imported model up with a -90 about X, and that
+    /// lands the character's face on local -Z, not the +Z that Unity calls "forward". A
+    /// 180 here was the obvious-looking thing to write and it pointed the entire crowd at
+    /// the glazed wall with their backs to the shooting.
+    ///
+    /// It is worth saying how that survived review, because none of the usual checks
+    /// caught it. The bodies measured as facing the range -- transform.forward came back
+    /// (0,0,-1) and the feet sat downrange of the hips -- because the prefab's -Z is its
+    /// front, so "forward" means the back of its head. Nor did it show from the firing
+    /// point, where the crowd is 6-16 m away and a stylised head reads much the same from
+    /// either side. It was only obvious from inside the stand, where the faces were
+    /// pointing the wrong way. The settling check is two renders of one figure from
+    /// opposite sides; see Captures/stills, and do that rather than trusting an axis
+    /// convention next time.
     /// </summary>
-    static readonly Quaternion Facing = Quaternion.Euler(0f, 180f, 0f);
+    static readonly Quaternion Facing = Quaternion.identity;
 
     struct Finish
     {
