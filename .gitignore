@@ -43,3 +43,6 @@ quest-app/*.aab
 
 # Editor screenshot output (Quest ▸ camera captures), regenerated on demand.
 quest-app/[Cc]aptures/
+quest-app/*.slnx
+quest-app/Assets/[Ss]creenshots/
+quest-app/Assets/[Ss]creenshots.meta
