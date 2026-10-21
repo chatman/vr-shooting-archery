@@ -1,0 +1,205 @@
+using System.Reflection;
+using UnityEditor;
+using UnityEngine;
+
+/// <summary>
+/// Records the spectator stand as a numbered PNG sequence, for turning into a clip with
+/// ffmpeg. A development tool, not part of the app: it lives in an Editor folder, so it
+/// is compiled out of every build, and it writes to quest-app/Captures/, which .gitignore
+/// already keeps out of the repository.
+///
+/// WHY NOT JUST SCREEN-GRAB. The crowd's motion is deliberately slow -- breathing, weight
+/// shifts, a head turning to a neighbour -- and a recorder that drops frames whenever the
+/// editor is busy turns that into a stutter that looks like a bug. Time.captureFramerate
+/// pins the simulation to a fixed step, so each rendered frame is exactly 1/FPS of game
+/// time no matter how long the encode takes. The clip comes out smooth and the wall-clock
+/// cost is irrelevant.
+///
+/// THE CAMERA SITS WHERE THE PLAYER DOES, at the firing point, turned round to face the
+/// stand. In play that view is the one thing the spectators are built for; it is also the
+/// only time they are animating at all, since Spectator culls them completely while they
+/// are off-screen and the player is normally facing downrange.
+/// </summary>
+public static class CrowdCapture
+{
+    const string ArmedKey = "CrowdCapture.Armed";
+
+    [MenuItem("Quest/14. Record the Crowd")]
+    public static void Record()
+    {
+        // Entering play mode reloads the domain, so the intent has to survive it.
+        SessionState.SetBool(ArmedKey, true);
+        EditorApplication.isPlaying = true;
+    }
+
+    [InitializeOnLoadMethod]
+    static void Hook()
+    {
+        EditorApplication.playModeStateChanged += state =>
+        {
+            if (state != PlayModeStateChange.EnteredPlayMode) return;
+            if (!SessionState.GetBool(ArmedKey, false)) return;
+            SessionState.SetBool(ArmedKey, false);
+            new GameObject("__crowdcapture").AddComponent<CrowdRecorder>();
+        };
+    }
+}
+
+/// <summary>
+/// The recorder itself. An Editor-assembly MonoBehaviour: it cannot be attached to a
+/// saved scene object and it does not exist in a build, but the editor loads the assembly
+/// during play, so AddComponent works for exactly as long as this session lasts.
+/// </summary>
+public class CrowdRecorder : MonoBehaviour
+{
+    public const int Fps = 30;
+    public const int Width = 1280;
+    public const int Height = 720;
+    public const float Seconds = 18f;
+
+    /// <summary>Firing point: the OVRCameraRig's own position, at standing eye height.</summary>
+    static readonly Vector3 Eye = new Vector3(1.5f, 1.62f, 11.45f);
+
+    string _dir;
+    Camera _cam;
+    RenderTexture _rt;
+    Texture2D _read;
+    int _frame;
+    int _total;
+
+    void Awake()
+    {
+        _total = Mathf.RoundToInt(Fps * Seconds);
+        _dir = System.IO.Path.Combine(Application.dataPath, "..", "Captures", "crowd");
+        _dir = System.IO.Path.GetFullPath(_dir);
+        if (System.IO.Directory.Exists(_dir)) System.IO.Directory.Delete(_dir, true);
+        System.IO.Directory.CreateDirectory(_dir);
+
+        Time.captureFramerate = Fps;
+
+        _rt = new RenderTexture(Width, Height, 24);
+        _read = new Texture2D(Width, Height, TextureFormat.RGB24, false);
+
+        var go = new GameObject("__capturecam");
+        go.transform.SetParent(transform, false);
+        _cam = go.AddComponent<Camera>();
+        _cam.nearClipPlane = 0.05f;
+        _cam.farClipPlane = 80f;
+        _cam.targetTexture = _rt;
+        // A camera with a target texture still takes part in culling, which is what keeps
+        // the Animators awake: rendering this view is what makes the stand "seen".
+        _cam.depth = 100;
+
+        Aim(0f);
+        Debug.Log("[Capture] " + _total + " frames at " + Fps + " fps into " + _dir);
+    }
+
+    /// <summary>Where the first shot cuts to the second.</summary>
+    public const float Cut = 9f;
+
+    /// <summary>
+    /// Two shots, both from the firing point, both facing +Z -- the stand is BEHIND the
+    /// shooter, so this is the view you get by turning round.
+    ///
+    /// The first is locked off and fairly tight. Motion this slow is only legible against
+    /// something that is not itself moving, so a camera that pans the whole time hides
+    /// the one thing the clip exists to show. The second pans, once the point is made, to
+    /// put the near rows in the context of the other nine.
+    ///
+    /// Pitch is NEGATIVE to look up. The stand's mass sits around y = 2.0 at z = 22,
+    /// which from a 1.62 m eye at z = 11.45 is about three degrees above the horizon; the
+    /// first attempt had the sign the other way and framed half a shot of empty floor.
+    /// </summary>
+    void Aim(float t)
+    {
+        if (t < Cut)
+        {
+            // Dead still, not even a slow drift. Nine seconds of a camera that does not
+            // move is what makes a spectator's shoulders rising readable at all, and it
+            // also makes the clip checkable: difference two frames of this shot and
+            // everything that lights up is a spectator. An earlier take drifted a degree
+            // and a half and the ceiling lights showed up in the difference as brightly
+            // as the crowd did.
+            _cam.fieldOfView = 44f;
+            _cam.transform.position = Eye;
+            _cam.transform.rotation = Quaternion.Euler(-4.5f, -7f, 0f);
+            return;
+        }
+
+        float v = Mathf.Clamp01((t - Cut) / (Seconds - Cut));
+        float ease = v * v * (3f - 2f * v);
+        _cam.fieldOfView = 72f;
+        _cam.transform.position = Eye;
+        _cam.transform.rotation = Quaternion.Euler(-3f, Mathf.Lerp(-15f, 15f, ease), 0f);
+    }
+
+    /// <summary>
+    /// Brings a few stand-ups forward so an 18 second clip can show them at all. Left to
+    /// itself a spectator sits for 40 to 150 seconds before it considers getting up,
+    /// which is right for the app and useless for a demo, so the private countdown is
+    /// shortened on a handful of them. Nothing else about their behaviour is touched.
+    ///
+    /// They are chosen by where they are sitting, not by whatever the scene hands over
+    /// first. The locked-off shot is 44 degrees wide and only covers about five and a
+    /// half metres of the front row; picking at random put every nudged spectator out of
+    /// frame and the first take showed nobody getting up at all.
+    /// </summary>
+    void Nudge(int count)
+    {
+        var field = typeof(Spectator).GetField("_nextPose",
+            BindingFlags.Instance | BindingFlags.NonPublic);
+        if (field == null) return;
+
+        var inShot = new System.Collections.Generic.List<Spectator>();
+        foreach (var s in FindObjectsByType<Spectator>(FindObjectsSortMode.None))
+        {
+            if (s.Rig == null) continue;
+            if ((float)field.GetValue(s) < 5f) continue;       // already on its way up
+            if (Mathf.Abs(s.transform.position.x - 0.7f) > 2.0f) continue;
+            inShot.Add(s);
+        }
+        // Spread them across the frame rather than clustering on whichever end was first.
+        inShot.Sort((a, b) => a.transform.position.x.CompareTo(b.transform.position.x));
+
+        for (int i = 0; i < count && inShot.Count > 0; i++)
+        {
+            var s = inShot[(i * inShot.Count) / Mathf.Max(1, count)];
+            s.StandChance = 1f;
+            field.SetValue(s, 0.1f);
+        }
+    }
+
+    void LateUpdate()
+    {
+        float t = _frame / (float)Fps;
+        if (_frame == 2 * Fps) Nudge(4);
+        if (_frame == 8 * Fps) Nudge(3);
+
+        Aim(t);
+        _cam.Render();
+
+        var prev = RenderTexture.active;
+        RenderTexture.active = _rt;
+        _read.ReadPixels(new Rect(0, 0, Width, Height), 0, 0);
+        _read.Apply(false);
+        RenderTexture.active = prev;
+
+        System.IO.File.WriteAllBytes(
+            System.IO.Path.Combine(_dir, "f" + _frame.ToString("D5") + ".png"),
+            _read.EncodeToPNG());
+
+        _frame++;
+        if (_frame < _total) return;
+
+        Debug.Log("[Capture] wrote " + _frame + " frames to " + _dir);
+        Time.captureFramerate = 0;
+        EditorApplication.isPlaying = false;
+    }
+
+    void OnDestroy()
+    {
+        Time.captureFramerate = 0;
+        if (_cam != null) _cam.targetTexture = null;
+        if (_rt != null) _rt.Release();
+    }
+}
