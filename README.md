@@ -1,4 +1,6 @@
 > **This project is part of Deveshi Khanna's Ph.D. work.**
+>
+> Contributors: Ishan Chattopadhyaya and Yagnashree GD.
 
 # VR Air Pistol Shooting Range (Quest 3)
 
