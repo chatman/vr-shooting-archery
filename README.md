@@ -1,3 +1,5 @@
+> **This project is part of Deveshi Khanna's Ph.D. work.**
+
 # 3D world generation (ComfyUI)
 
 Three pipelines:
